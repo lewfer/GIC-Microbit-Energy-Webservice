@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<!-- saved from url=(0093)https://www.pythonanywhere.com/user/lewfer/files/home/lewfer/mysite/templates/dashboard2.html -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<link rel="stylesheet" href="{{url_for('static', filename='main.css')}}">
+
+<!-- Load d3.js -->
+
+<script src="{{url_for('static', filename='d3.v4.js')}}"></script>
+
+<!-- Create a div where the graph will take place -->
+</head><body data-new-gr-c-s-check-loaded="14.1086.0" data-gr-ext-installed="">
+<h1>National Grid Energy Monitor</h1>
+<h2>All Time Generation</h2>
+<div id="alltime"><svg width="460" height="400"><g transform="translate(50,10)"></g></svg></div>
+<h2>Recent</h2>
+<div id="my_dataviz"></div>
+
+
+<!-- All time bar chart -->
+<script>
+    function convertNumbers(data) {
+        data.forEach(function(d) {
+            for (let key in d) {
+              if (+d[key]===+d[key]) {
+                d[key] = +d[key]
+              }
+            }
+          });
+    }
+
+    // set the dimensions and margins of the graph
+    var margin = {top: 10, right: 30, bottom: 20, left: 50},
+        width = 460 - margin.left - margin.right,
+        height = 400 - margin.top - margin.bottom;
+
+    // append the svg object to the body of the page
+    var svg = d3.select("#alltime")
+      .append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+      .append("g")
+        .attr("transform",
+              "translate(" + margin.left + "," + margin.top + ")");
+
+    // Parse the Data
+    d3.csv("/getcsvdata", function(data) {
+    convertNumbers(data)
+console.log(data)
+      // List of subgroups = header of the csv files = soil condition here
+      var subgroups = data.columns.slice(1)
+
+      // List of groups = species here = value of the first column called group -> I show them on the X axis
+      var groups = d3.map(data, function(d){return(d.generator)}).keys()
+
+      maxd =  d3.max(data, d => d.wind + d.solar)
+      console.log(maxd)
+
+      // Add X axis
+      var y = d3.scaleBand()
+          .domain(groups)
+          .range([0, height])
+          .padding([0.2])
+      svg.append("g")
+        //.attr("transform", "translate(0," + height + ")")
+        .call(d3.axisLeft(y));
+
+      // Add Y axis
+      var x = d3.scaleLinear()
+        .domain([0, maxd])
+        .range([ 0, width ]);
+      svg.append("g")
+        .attr("transform", "translate(0," + height + ")")
+        .call(d3.axisBottom(x));
+
+      // color palette = one color per subgroup
+      var color = d3.scaleOrdinal()
+        .domain(subgroups)
+        .range(['#387ABE','#ff9200','#4daf4a'])
+
+      //stack the data? --> stack per subgroup
+      var stackedData = d3.stack()
+        .keys(subgroups)
+        (data)
+
+
+        console.log(stackedData)
+
+      // Show the bars
+      svg.append("g")
+        .selectAll("g")
+        // Enter in the stack data = loop key per key = group per group
+        .data(stackedData)
+        .enter().append("g")
+          .attr("fill", function(d) { return color(d.key); })
+          .selectAll("rect")
+          // enter a second time = loop subgroup per subgroup to add all rectangles
+          .data(function(d) { return d; })
+          .enter().append("rect")
+            .attr("y", function(d) { return y(d.data.generator); })
+            .attr("x", function(d) { return x(d[0]); })
+            .attr("width", function(d) { return x(d[1]) ; })
+            .attr("height",y.bandwidth())
+    })
+
+    setTimeout(function(){window.location.reload(1);}, 5000);
+
+    </script></body>
