@@ -52,14 +52,14 @@ def resetEverything():
     data['redZone'] = 5000         # total energy below which bar goes red
     data['on'] = 1                 # is national grid on or off?
 
-def addEnergy(stationName, wind, solar):
+def addEnergy(station, wind, solar):
     """Add energy from the power station"""
 
     # Add to station's total
-    if not stationName in data["stations"]:
-        data["stations"][stationName] = {'wind':0,'solar':0}
-    data["stations"][stationName]['wind'] += wind
-    data["stations"][stationName]['solar'] += solar
+    if not station in data["stations"]:
+        data["stations"][station] = {'wind':0,'solar':0}
+    data["stations"][station]['wind'] += wind
+    data["stations"][station]['solar'] += solar
 
     # Add to total total
     data['totalWind'] += wind
@@ -85,14 +85,14 @@ def add():
 
     if data['on']:
         # Get request arguments
-        stationName = request.args.get('stationName')
+        station = request.args.get('station')
         wind = request.args.get('wind')
         solar = request.args.get('solar')
         wind = int(wind)
         solar = int(solar)
 
         # Add energy to grid
-        addEnergy(stationName, wind, solar)
+        addEnergy(station, wind, solar)
 
     # Return data in response
     return jsonify(data)
@@ -242,4 +242,5 @@ def controlTestData():
     return redirect(url_for('control'))
 
 if __name__ == '__main__':
-   app.run(threaded=False, host="0.0.0.0", port=8000)
+   #app.run(threaded=False, host="0.0.0.0", port=8000)
+   app.run(threaded=True, host="0.0.0.0", port=8000)
