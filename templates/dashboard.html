@@ -4,41 +4,30 @@
 <link rel="stylesheet" href="{{url_for('static', filename='main.css')}}">
 
 <!-- Load d3.js -->
-
 <script src="{{url_for('static', filename='d3.v4.js')}}"></script>
 
-<!-- Create a div where the graph will take place -->
-</head><body data-new-gr-c-s-check-loaded="14.1086.0" data-gr-ext-installed="">
-<h1>National Grid Energy Monitor</h1>
-<div class="panel">
-  <h2>Power Stations</h2>
-  <h3>&nbsp;</h3>
-  <div id="userenergy" class="chart"></div>
-</div>
-<div class="panel">
-  <h2>Total Generation</h2>
-  <h3 id="totalgenerationvalue">0</h3>
-  <div id="totalgeneration" class="chart"></div>
-</div>
-<div class="panel">
-  <h2>Total Available</h2>
-  <h3 id="totalavailablevalue">0</h3>
-  <div id="totalavailable" class="chart"></div>
-</div>
+</head>
+  <body>
+    <div class="logo"><img src="{{url_for('static', filename='gic.png')}}" alt="Girls into Coding" height="80"></div>
+    <div class="logo"><img src="{{url_for('static', filename='octopus.png')}}" alt="Octopus Energy" height="50"></div>
+    <h1>National Grid Energy Monitor</h1>
+    <div class="panel">
+      <h2>Power Stations</h2>
+      <h3 id="totalGeneratedValue">0</h3>
+      <!-- Placeholder for chart -->
+      <div id="stationEnergy" class="chart"></div>
+    </div>
+    <div class="panel">
+      <h2>Total Available</h2>
+      <h3 id="totalAvailableValue">0</h3>
+      <!-- Placeholder for charts -->
+      <div id="totalAvailable" class="chart"></div>
+    </div>
 
 <!-- All time bar chart -->
 <script>
     // Data from app
-    //let appData = {{appData|safe}}
-    /*
-    let consumptionRate = {{consumptionRate|safe}}
-    let yellowZone = {{yellowZone|safe}}
-    let redZone = {{redZone|safe}}
-    let totalGenerated = {{totalGenerated|safe}}
-    let totalWind = {{totalWind|safe}}
-    let totalSolar = {{totalSolar|safe}}
-    let totalUsed = {{totalUsed|safe}}*/
-
+    let appData = {{appData|safe}}
 
     // Function to convert anything that looks like a number to a number
     function convertNumbers(data) {
@@ -51,38 +40,57 @@
         });
     }
 
+    function wrap(text, width) {
+      text.each(function() {
+        var text = d3.select(this),
+            words = text.text().split(/\s+/).reverse(),
+            word,
+            line = [],
+            lineNumber = 0,
+            lineHeight = 1.1, // ems
+            y = text.attr("y"),
+            dy = parseFloat(text.attr("dy")),
+            tspan = text.text(null).append("tspan").attr("x", 0).attr("y", y).attr("dy", dy + "em")
+        while (word = words.pop()) {
+          line.push(word)
+          tspan.text(line.join(" "))
+          if (tspan.node().getComputedTextLength() > width) {
+            line.pop()
+            tspan.text(line.join(" "))
+            line = [word]
+            tspan = text.append("tspan").attr("x", 0).attr("y", y).attr("dy", `${++lineNumber * lineHeight + dy}em`).text(word)
+          }
+        }
+      })
+    }
+
     // set the dimensions and margins of the graph
-    var margin = {top: 10, right: 30, bottom: 20, left: 50},
-        width = 460 - margin.left - margin.right,
-        height = 400 - margin.top - margin.bottom;
+    var margin1 = {top: 10, right: 30, bottom: 20, left: 200},
+        width = 850 - margin1.left - margin1.right,
+        height = 400 - margin1.top - margin1.bottom;
+
+    // set the dimensions and margins of the graph
+    var margin2 = {top: 10, right: 30, bottom: 20, left: 40},
+        width = 400 - margin2.left - margin2.right,
+        height = 400 - margin2.top - margin2.bottom;        
 
     // Insert the SVG object
-    var svgUser = d3.select("#userenergy")
+    var svgUser = d3.select("#stationEnergy")
       .append("svg")
-        .attr("width", width + margin.left + margin.right)
-        .attr("height", height + margin.top + margin.bottom)
+        .attr("width", width + margin1.left + margin1.right)
+        .attr("height", height + margin1.top + margin1.bottom)
       .append("g")
         .attr("transform",
-              "translate(" + margin.left + "," + margin.top + ")");
-
-
-    // Insert the SVG object
-    var svgTotalGeneration = d3.select("#totalgeneration")
-      .append("svg")
-        .attr("width", width/2 + margin.left + margin.right)
-        .attr("height", height + margin.top + margin.bottom)
-      .append("g")
-        .attr("transform",
-              "translate(" + margin.left + "," + margin.top + ")");
+              "translate(" + margin1.left + "," + margin1.top + ")");
 
     // Insert the SVG object
-    var svgTotalAvailable = d3.select("#totalavailable")
+    var svgTotalAvailable = d3.select("#totalAvailable")
       .append("svg")
-        .attr("width", width/2 + margin.left + margin.right)
-        .attr("height", height + margin.top + margin.bottom)
+        .attr("width", width/2 + margin2.left + margin2.right)
+        .attr("height", height + margin2.top + margin2.bottom)
       .append("g")
         .attr("transform",
-              "translate(" + margin.left + "," + margin.top + ")");
+              "translate(" + margin2.left + "," + margin2.top + ")");
 
     // Parse the Data
     d3.csv("/getcsvdata", function(data) {
@@ -90,65 +98,45 @@
       convertNumbers(data)
 
       // 
-      /* Data is a complete hack!  E.g. you may get this:
+      /* Data is a like this:
 
          generator  wind  solar
          ---------- ----- ------
-         total      100   50
-         used       150   35
-         yr         10000 5000
          mary       80    20
          susan      20    30
-
-         
-         Row 0 (total) is the generation amount (wind, solar)
-         Row 1 (used) is the total generation (in wind column) and total used (in solar column)
-         Row 2 (yr) is the yellow and red zone
-         Rows 3 onwards are the data from the users (generators)
-
-         At some point make this work with JSON to avoid this hack.
       */
       
       // Powerstations chart: Skip the total rows in the data and display the rest
-      powerstations = data.slice(3)
-      powerstations.columns = data.columns
-      stackedBar(powerstations)
+      stackedBar(data)
+      document.getElementById("totalGeneratedValue").innerHTML = appData.totalGenerated
 
-      // Total generation chart: Select just first row for generation bar
-      totalgeneration = [data[0]]
-      totalgeneration.columns = data.columns
-      bar(totalgeneration, svgTotalGeneration)
-      document.getElementById("totalgenerationvalue").innerHTML = totalgeneration[0].wind+ totalgeneration[0].solar
-
-      // Total available chart: Select just second row for available bar, together with the third row for the yellow/red values
-      totalavailable = [data[1]]
-      totalavailable.columns = data.columns
-      //bar(totalavailable, svgTotalAvailable, data[2].wind, data[2].solar)    // hack - wind->yellow, solar->red   
-      //bar(totalavailable, svgTotalAvailable, appData.yellowZone, appData.redZone)    // hack - wind->yellow, solar->red   
-      //document.getElementById("totalavailablevalue").innerHTML = totalavailable[0].wind - totalavailable[0].solar
+      // Total available chart
+      totalAvailable = appData.totalGenerated - appData.totalUsed
+      onebar([totalAvailable], svgTotalAvailable, appData.yellowZone, appData.redZone)  
+      document.getElementById("totalAvailableValue").innerHTML = totalAvailable
 
       // ------------------------------------------------------------------------------------------
-      function bar(data, svg, yellow, red) {
+      function onebar(data, svg, yellow, red) {
+        // data will be a list with a single value
 
         console.log(data)
 
         // Get max total bar length
-        maxd =  d3.max(data, d => d.wind + d.solar)
+        maxd =  data[0] 
+        maxy = Math.max(yellow, red, maxd)
 
+        // X scaler (for single bar)
         var x = d3.scaleBand()
           .range([ 0, width ])
-          .domain(data.map(function(d) { return d.generator; }))
+          .domain([1,1])
           .padding(0.2);
 
-        if (yellow==undefined) // generation bar
-          maxy = maxd
-        else
-          maxy = Math.max(5000,maxd) // availablebar
-
-        // Add Y axis
+        // Y scaler
         var y = d3.scaleLinear()
           .domain([0, maxy])
           .range([ height, 0]);
+
+        // Y axis
         svg.append("g")
           .call(d3.axisLeft(y));
 
@@ -157,11 +145,11 @@
           .data(data)
           .enter()
           .append("rect")
-            .attr("x", function(d) { return x(d.generator); })
-            .attr("y", function(d) { return y(d.wind+d.solar); })
+            .attr("x", function(d) { return x(d); })
+            .attr("y", function(d) { return y(d); })
             .attr("width", x.bandwidth())
-            .attr("height", function(d) { return height - y(d.wind+d.solar); })
-            .attr("fill", function(d) {return (d.wind+d.solar)<red?"#690000":(d.wind+d.solar)<yellow?"#696900":"#69b3a2"})         
+            .attr("height", function(d) { return height - y(d); })
+            .attr("fill", function(d) {return (data)<red?"#cc3232":(data)<yellow?"#e7b416":"#2dc937"})         
       }
 
       // ------------------------------------------------------------------------------------------
@@ -171,25 +159,30 @@
         var subgroups = data.columns.slice(1)
 
         // List of groups in the data
-        var groups = d3.map(data, function(d){return(d.generator)}).keys()
+        var groups = d3.map(data, function(d){return(d.station)}).keys()
 
         // Get max total bar length
         maxd =  d3.max(data, d => d.wind + d.solar)
 
-
-        // Add X axis
+        // Y scaler
         var y = d3.scaleBand()
             .domain(groups)
             .range([0, height])
             .padding([0.2])
-        svgUser.append("g")
+
+        // Y axis
+        yaxis = svgUser.append("g")
           //.attr("transform", "translate(0," + height + ")")
           .call(d3.axisLeft(y));
+        yaxis.selectAll(".tick text")
+          .attr("font-size","18") //.call(wrap, 150)
 
-        // Add Y axis
+        // X scaler
         var x = d3.scaleLinear()
           .domain([0, maxd])
           .range([ 0, width ]);
+
+        // X axis
         svgUser.append("g")
           .attr("transform", "translate(0," + height + ")")
           .call(d3.axisBottom(x));
@@ -197,14 +190,14 @@
         // Color palette - one color per subgroup
         var color = d3.scaleOrdinal()
           .domain(subgroups)
-          .range(['#387ABE','#ff9200','#4daf4a'])
+          .range(['#008ff4','#ffd458'])
 
-        // Stack the data
+        // Stack the data into groups
         var stackedData = d3.stack()
           .keys(subgroups)
           (data)
 
-          console.log(stackedData)
+        console.log(stackedData)
 
         // Show the bars
         svgUser.append("g")
@@ -217,7 +210,7 @@
             // enter a second time = loop subgroup per subgroup to add all rectangles
             .data(function(d) { return d; })
             .enter().append("rect")
-              .attr("y", function(d) { return y(d.data.generator); })
+              .attr("y", function(d) { return y(d.data.station); })
               .attr("x", function(d) { return x(d[0]); })
               .attr("width", function(d) { return x(d[1])-x(d[0]) ; })
               .attr("height",y.bandwidth())
@@ -225,6 +218,6 @@
     })
 
     // Timer loop to refresh the page
-    //setTimeout(function(){window.location.reload(1);}, 5000);
+    setTimeout(function(){window.location.reload(1);}, 3000);
 
     </script></body>

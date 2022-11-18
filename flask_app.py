@@ -3,6 +3,7 @@
 
 from flask import Flask, render_template, redirect, make_response, url_for
 from flask import request, session, jsonify
+from random import randint
 #from io import StringIO
 #import csv
 
@@ -14,9 +15,9 @@ app = Flask(__name__,
             template_folder=rootDir+'templates/',
             static_folder=rootDir+'static/')
             
-
+# Not thread-safe, but should be ok in single-threaded developer Flask
 data = {}
-data['users'] = {}
+data['stations'] = {}
 data['totalGenerated'] = 0
 data['totalWind'] = 0
 data['totalSolar'] = 0
@@ -24,10 +25,9 @@ data['totalUsed'] = 0
 data['consumptionRate'] = 1/5  # proportion of device power used on each call
 data['yellowZone'] = 10000     # total energy below which bar goes yellow
 data['redZone'] = 5000         # total energy below which bar goes red
+data['on'] = 1                 # is national grid on or off?
 
-consumptionRate = 1/5  # proportion of device power used on each call
-yellowZone = 10000     # total energy below which bar goes yellow
-redZone = 5000         # total energy below which bar goes red
+
 
 
 #mysql = "gecko101"
@@ -38,19 +38,40 @@ app.secret_key = b'A]qr>n@2XB"{B;CN'
 # -------------------------------------------------------------------------------------------------
 # Helper functions
 # -------------------------------------------------------------------------------------------------
+def resetEverything():
+    """Reset all the data"""
+    global data
+    data = {}
+    data['stations'] = {}
+    data['totalGenerated'] = 0
+    data['totalWind'] = 0
+    data['totalSolar'] = 0
+    data['totalUsed'] = 0
+    data['consumptionRate'] = 1/5  # proportion of device power used on each call
+    data['yellowZone'] = 10000     # total energy below which bar goes yellow
+    data['redZone'] = 5000         # total energy below which bar goes red
+    data['on'] = 1                 # is national grid on or off?
 
+def addEnergy(stationName, wind, solar):
+    """Add energy from the power station"""
 
-def addEnergy(username, wind, solar):
-    # Add to user's total
-    if not username in data:
-        data["users"][username] = {'wind':0,'solar':0}
-    data["users"][username]['wind'] += wind
-    data["users"][username]['solar'] += solar
+    # Add to station's total
+    if not stationName in data["stations"]:
+        data["stations"][stationName] = {'wind':0,'solar':0}
+    data["stations"][stationName]['wind'] += wind
+    data["stations"][stationName]['solar'] += solar
 
     # Add to total total
     data['totalWind'] += wind
     data['totalSolar'] += solar
     data['totalGenerated'] += wind+solar
+
+def useEnergy(energy):
+    """Use energy from the power station"""
+
+    # Add to used energy, applying consumption rate
+    data['totalUsed'] += int(energy * data['consumptionRate'])
+
 
 
 
@@ -58,80 +79,76 @@ def addEnergy(username, wind, solar):
 # Route handlers
 # -------------------------------------------------------------------------------------------------
 
-@app.route('/')
-def hello_world():
-    return 'Girls into Coding Energy Project'
-
-
-@app.route('/register')
-def register():
-    username  = request.args.get('user')
-    data["users"][username] = {'wind':0,'solar':0}
-    return 'Succeeded'
-
-@app.route('/whoami')
-def whoami():
-    return session['username']
-
 @app.route('/add')
 def add():
-    username = request.args.get('username')
-    wind = request.args.get('wind')
-    solar = request.args.get('solar')
-    wind = int(wind)
-    solar = int(solar)
-    addEnergy(username, wind, solar)
+    """Add energy from the power station"""
+
+    if data['on']:
+        # Get request arguments
+        stationName = request.args.get('stationName')
+        wind = request.args.get('wind')
+        solar = request.args.get('solar')
+        wind = int(wind)
+        solar = int(solar)
+
+        # Add energy to grid
+        addEnergy(stationName, wind, solar)
+
+    # Return data in response
     return jsonify(data)
+
 
 @app.route('/use')
 def use():
-    energy = int(request.args.get('energy'))
-    data['totalUsed'] += int(energy * consumptionRate)
+    """Use energy from the power station"""
+
+    if data['on']:
+        # Get request arguments
+        energy = int(request.args.get('energy'))
+
+        # Add to used energy, applying consumption rate
+        useEnergy(energy)
+
+    # Return data in response
     return jsonify(data)
 
-@app.route('/get')
-def get():
+
+@app.route('/status')
+def status():
+    """Get the current status"""
+
     return jsonify(data)
+
 
 @app.route('/getcsvdata')
-def getcsvdata():
-    c = "generator,wind,solar\r\n"
+def getCsvData():
+    """Get the station data as a csv"""
 
-    # Add total data
-    c += "total" + "," + str(data["totalWind"]) + "," + str(data["totalSolar"])+"\r\n"
+    c = "station,wind,solar\r\n"
 
-    # Add total generated/used (hack!!)
-    c += "used" + "," + str(data['totalGenerated']) + "," + str(data['totalUsed'])+"\r\n"
-
-    # Add yellow/red zone (hack!!)
-    c += "yr" + "," + str(yellowZone) + "," + str(redZone)+"\r\n"
-
-    # Add user data
-    for k in data["users"].keys():
+    # Add station data
+    for k in data["stations"].keys():
         #if not k.startswith("total"):
-            c += k + "," + str(data["users"][k]["wind"]) + "," + str(data["users"][k]["solar"])+"\r\n"
+            c += k + "," + str(data["stations"][k]["wind"]) + "," + str(data["stations"][k]["solar"])+"\r\n"
 
     output = make_response(c)
     #output.headers["Content-Disposition"] = "attachment; filename=export.csv"
     output.headers["Content-type"] = "text/csv"
     return output
 
-    #return csv
 
+@app.route('/getavailableenergy')
+def getAvailableEnergy():
+    """Get the total energy available"""
 
-@app.route('/gettotalenergy')
-def gettotalenergy():
-    #totalEnergy = 0
-    #for i, value in enumerate(data):
-    #    totalEnergy += data[value]["wind"]+data[value]["solar"]
     return jsonify(data['totalGenerated']-data['totalUsed'])
+
 
 @app.route('/reset')
 def reset():
-    global data
-    data = {}
-    data['totalGenerated'] = 0
-    data['totalUsed'] = 0
+    """Reset everything"""
+
+    resetEverything()
     return jsonify(data)
 
 
@@ -140,7 +157,8 @@ def reset():
 
 @app.route('/dashboard')
 def dashboard():
-    return render_template('dashboard.html')#, appData=data)
+    """Show the dashboard, with charts"""
+    return render_template('dashboard.html', appData=data)
 
 
 # -------------------------------------------------------------------------------------------------
@@ -148,41 +166,80 @@ def dashboard():
 
 @app.route('/control')
 def control():
-    return render_template('control.html', consumptionRate=consumptionRate, yellowZone=yellowZone, redZone=redZone)
+    """Show the control centre page"""
+    return render_template('control.html', appData=data) 
 
-@app.route('/import')
-def importEnergy():
-    username = request.args.get('username')
-    wind = request.args.get('wind')
-    solar = request.args.get('solar')
-    wind = int(wind)
-    solar = int(solar)
-    addEnergy(username, wind, solar)
+@app.route('/controlOnOff')
+def controlOnOff():
+    """Turn grid on or off"""
+    on = request.args.get('gridOn')
+    data["on"] = 1 if on else 0
+
+    # Redirect to control page
+    return redirect(url_for('control'))
+
+
+@app.route('/controlAddEnergy')
+def controlAddEnergy():
+    """Handle import and add energy forms"""
+
+    if data['on']:
+        # Get args
+        station = request.args.get('station')
+        wind = request.args.get('wind')
+        solar = request.args.get('solar')
+        wind = int(wind)
+        solar = int(solar)
+
+        # Add energy
+        addEnergy(station, wind, solar)
+
+    # Redirect to control page
+    return redirect(url_for('control'))
+
+
+@app.route('/controlResetZero')
+def controlResetZero():
+    """Handle Reset form.  Reset everything to 0"""
+    resetEverything()
+    return redirect(url_for('control'))
+
+@app.route('/controlUseEnergy')
+def controlUseEnergy():
+    """Handle Use Energy form"""
+
+    if data['on']:    
+        # Get args
+        energy = int(request.args.get('energy'))
+
+        # Use energy from power station
+        useEnergy(energy)
 
     return redirect(url_for('control'))
 
-@app.route('/resetzero')
-def resetZero():
-    global data
-    data = {}
-    data['totalGenerated'] = 0
-    data['totalUsed'] = 0
-    return redirect(url_for('control'))
-
-@app.route('/useenergy')
-def useEnergy():
-    energy = int(request.args.get('energy'))
-    data['totalUsed'] += int(energy * consumptionRate)
-    return redirect(url_for('control'))
-
-@app.route('/settings')
-def settings():
+@app.route('/controlSettings')
+def controlSettings():
+    """Handle Settings form"""
     global consumptionRate, yellowZone, redZone
-    consumptionRate = float(request.args.get('consumptionRate'))
-    yellowZone = float(request.args.get('yellowZone'))
-    redZone = float(request.args.get('redZone'))
+    data["consumptionRate"] = float(request.args.get('consumptionRate'))
+    data["yellowZone"] = float(request.args.get('yellowZone'))
+    data["redZone"] = float(request.args.get('redZone'))
     return redirect(url_for('control'))
 
+@app.route('/controlTestData')
+def controlTestData():
+    """Add test data"""    
+    addEnergy("Panda Power", randint(0,100), randint(0,100))
+    addEnergy("Eagle Energy", randint(0,100), randint(0,100))
+    addEnergy("Rhino Renewables", randint(0,100), randint(0,100))
+    addEnergy("Swan Sustainables", randint(0,100), randint(0,100))
+    addEnergy("Gecko Green Energy", randint(0,100), randint(0,100))
+    addEnergy("Possum Power", randint(0,100), randint(0,100))
+    addEnergy("Emu Energy", randint(0,100), randint(0,100))
+    addEnergy("Robin Renewables", randint(0,100), randint(0,100))
+    addEnergy("Stingray Sustainables", randint(0,100), randint(0,100))
+    addEnergy("Gazelle Green Energy", randint(0,100), randint(0,100))
+    return redirect(url_for('control'))
 
 if __name__ == '__main__':
-   app.run()
+   app.run(threaded=False, host="0.0.0.0", port=8000)

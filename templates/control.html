@@ -3,19 +3,27 @@
 <html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <link rel="stylesheet" href="{{url_for('static', filename='main.css')}}">
 
-<!-- Load d3.js -->
-
 <!-- Create a div where the graph will take place -->
 </head><body data-new-gr-c-s-check-loaded="14.1086.0" data-gr-ext-installed="">
 <h1>National Grid Energy Monitor</h1>
 <h2>Control Centre</h2>
 
 
+<h3>Grid On / Off</h3>
+<form action="/controlOnOff">
+    <p>When off, power cannot be added or used</p>
+    <label class="switch">
+        <input type="checkbox" name="gridOn" onChange="this.form.submit()" {% if appData["on"] %} checked {% endif %}>
+        <span class="slider round"></span>
+    </label>
+</form>
+
+
 <!-- Import Energy Form -->
 <div class="panel">
     <h3>Import Energy</h3>
-    <form action="/import">
-        <input type="hidden" id="importusername" name="username" value="import"><br><br>
+    <form action="/controlAddEnergy">
+        <input type="hidden" id="importstation" name="station" value="import">
         <label for="html">Wind:</label>
         <input type="text" id="importwind" name="wind" value="100"><br><br>
         <label for="html">Solar:</label>
@@ -27,13 +35,13 @@
 <!-- Add Energy Form -->
 <div class="panel">
     <h3>Add Energy</h3>
-    <form action="/import">
-        <label for="html">User:</label>
-        <input type="text" id="importusername" name="username" value="import"><br><br>
+    <form action="/controlAddEnergy">
+        <label for="html">Station:</label>
+        <input type="text" id="addstation" name="station" value=""><br><br>
         <label for="html">Wind:</label>
-        <input type="text" id="importwind" name="wind" value="100"><br><br>
+        <input type="text" id="addwind" name="wind" value="100"><br><br>
         <label for="html">Solar:</label>
-        <input type="text" id="importsolar" name="solar" value="100"><br><br>
+        <input type="text" id="addsolar" name="solar" value="100"><br><br>
         <button type="submit">Add</button>
     </form>
 </div>
@@ -41,7 +49,7 @@
 <!-- Reset Form -->
 <div class="panel">
     <h3>Reset to 0</h3>
-    <form action="/resetzero">
+    <form action="/controlResetZero">
         <button type="submit" onclick="return confirm('Are you sure you want to reset energy?')">Reset</button>
     </form>
 </div>
@@ -49,28 +57,43 @@
 <!-- Use Form -->
 <div class="panel">
     <h3>Use Energy</h3>
-    <form action="/useenergy">
+    <form action="/controlUseEnergy">
         <label for="html">Units:</label>
         <input type="text" id="energy" name="energy" value="10"><br><br>
         <button type="submit">Use</button>
     </form>
 </div>
+
+<!-- Reset Form -->
+<div class="panel">
+    <h3>Add Test Data</h3>
+    <form action="/controlTestData">
+        <button type="submit" onclick="return confirm('Are you sure you want to add test data?')">Add Data</button>
+    </form>
+</div>
+
 <!-- Settings Form -->
 <div class="panel">
     <h3>Settings</h3>
-    <form action="/settings">
+    <form action="/controlSettings">
         <p>Consumption Rate is the number of units consumed per unit requested.  Higher means energy is consumed faster.</p>
         <label for="html">Consumption Rate:</label>
-        <input type="text" id="consumptionRate" name="consumptionRate" value="{{consumptionRate}}"><br><br>
+        <input type="text" id="consumptionRate" name="consumptionRate" value="{{appData['consumptionRate']}}"><br><br>
         
         <label for="html">Yellow Zone:</label>
-        <input type="text" id="yellowZone" name="yellowZone" value="{{yellowZone}}"><br><br>
+        <input type="text" id="yellowZone" name="yellowZone" value="{{appData['yellowZone']}}"><br><br>
         
         <label for="html">Red Zone:</label>
-        <input type="text" id="redZone" name="redZone" value="{{redZone}}"><br><br>
+        <input type="text" id="redZone" name="redZone" value="{{appData['redZone']}}"><br><br>
         <button type="submit">Set</button>
         <button onclick='document.getElementById("consumptionRate").value=0.2;document.getElementById("yellowZone").value=10000;document.getElementById("redZone").value=5000;'>Default</button>
     </form>
+</div>
+
+<!-- Settings Form -->
+<div class="panel">
+    <h3>Status</h3>
+    <div class="margined"><p>{{appData}}</p></div>
 </div>
 
 
