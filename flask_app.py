@@ -4,12 +4,14 @@
 from flask import Flask, render_template, redirect, make_response, url_for
 from flask import request, session, jsonify
 from random import randint
+from threading import Lock
 #from io import StringIO
 #import csv
 
 #rootDir = "/home/lewfer/mysite/"           # pythonanywhere
 rootDir = ""                              # local
 
+lock = Lock()
 
 app = Flask(__name__,
             template_folder=rootDir+'templates/',
@@ -41,6 +43,8 @@ app.secret_key = b'A]qr>n@2XB"{B;CN'
 def resetEverything():
     """Reset all the data"""
     global data
+
+    lock.acquire()
     data = {}
     data['stations'] = {}
     data['totalGenerated'] = 0
@@ -51,9 +55,11 @@ def resetEverything():
     data['yellowZone'] = 10000     # total energy below which bar goes yellow
     data['redZone'] = 5000         # total energy below which bar goes red
     data['on'] = 1                 # is national grid on or off?
+    lock.release()
 
 def addEnergy(station, wind, solar):
     """Add energy from the power station"""
+    lock.acquire()
 
     # Add to station's total
     if not station in data["stations"]:
@@ -65,13 +71,16 @@ def addEnergy(station, wind, solar):
     data['totalWind'] += wind
     data['totalSolar'] += solar
     data['totalGenerated'] += wind+solar
+    lock.release()
 
 def useEnergy(energy):
     """Use energy from the power station"""
 
+    lock.acquire()
+
     # Add to used energy, applying consumption rate
     data['totalUsed'] += int(energy * data['consumptionRate'])
-
+    lock.release()
 
 
 
@@ -82,6 +91,8 @@ def useEnergy(energy):
 @app.route('/add')
 def add():
     """Add energy from the power station"""
+
+    print("add")
 
     if data['on']:
         # Get request arguments
@@ -221,9 +232,12 @@ def controlUseEnergy():
 def controlSettings():
     """Handle Settings form"""
     global consumptionRate, yellowZone, redZone
+
+    lock.acquire()
     data["consumptionRate"] = float(request.args.get('consumptionRate'))
     data["yellowZone"] = float(request.args.get('yellowZone'))
     data["redZone"] = float(request.args.get('redZone'))
+    lock.release()
     return redirect(url_for('control'))
 
 @app.route('/controlTestData')
@@ -242,5 +256,5 @@ def controlTestData():
     return redirect(url_for('control'))
 
 if __name__ == '__main__':
-   app.run(threaded=False, host="0.0.0.0", port=8000)
-   #app.run(threaded=True, host="0.0.0.0", port=8000)
+   #app.run(threaded=False, host="0.0.0.0", port=8000)
+   app.run(threaded=True, host="0.0.0.0", port=8000)
